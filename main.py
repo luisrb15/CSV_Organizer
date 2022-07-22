@@ -9,8 +9,8 @@ year = dt.datetime.now().year
 month = dt.datetime.now().month
 day = dt.datetime.now().day
 
-original_s3_bucket = XXXXXXXXX
-destination_s3_bucket = XXXXXXXXX
+original_s3_bucket = 'bootcamps-2022'
+destination_s3_bucket = 'bootcamps-2022-results'
 
 s3 = boto3.client("s3")
 
@@ -71,4 +71,6 @@ def main():
     file_name = CSVProcessor()
     ListBootamps(file_name)
 
-main()
+def lambda_handler(event, context):
+    main()
+    return "Success"
