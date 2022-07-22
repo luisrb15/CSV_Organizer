@@ -9,8 +9,8 @@ year = dt.datetime.now().year
 month = dt.datetime.now().month
 day = dt.datetime.now().day
 
-original_s3_bucket = 'bootcamps-2022'
-destination_s3_bucket = 'bootcamps-2022-results'
+original_s3_bucket = XXXXXXXXXXX
+destination_s3_bucket = XXXXXXXXXX
 
 s3 = boto3.client("s3")
 
