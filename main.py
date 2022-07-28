@@ -9,10 +9,11 @@ year = dt.datetime.now().year
 month = dt.datetime.now().month
 day = dt.datetime.now().day
 
-original_s3_bucket = XXXXXXXXXXX
-destination_s3_bucket = XXXXXXXXXX
+original_s3_bucket = 'bootcamps-2022'
+destination_s3_bucket = 'bootcamps-2022-results'
 
 s3 = boto3.client("s3")
+athena_client = boto3.client('athena')
 
 def ListBootamps(file_name):
     destination_folder = 'Bootcamps/'
@@ -44,6 +45,7 @@ def ListBootamps(file_name):
         s3.put_object(Bucket=destination_s3_bucket, Key=destination_folder + destination_file_name, Body=body)
 
 def CSVProcessor():
+    logger.info("Started CSVProcessor")
     last_modified = s3.list_objects(Bucket=original_s3_bucket)["Contents"][-1]
     for key in s3.list_objects(Bucket=original_s3_bucket)["Contents"]:
         if key["LastModified"] > last_modified["LastModified"]:
@@ -54,10 +56,10 @@ def CSVProcessor():
     file_name = last_modified_key.split("/")[-1] # get last part of key
         
     body = obj["Body"].read().decode("utf-8")
+    header = body.split("\n")[0]
     body = body.replace("\n\n", " ")
     body = body.replace("\n", " ")
     body = body.replace("%", "")
-    header = body.split("\n")[0]
     rows = body.split("\n")[1:]
 
     destination_key = f"{year}/{month}/{day}/{file_name}" # create new key
@@ -65,12 +67,40 @@ def CSVProcessor():
     destination_body = header + "\n" + "\n".join(rows) # join header and rows
 
     s3.put_object(Bucket=destination_s3_bucket, Key=destination_key, Body=destination_body)
-    return file_name
+    return file_name, header
+
+# def create_table(file_name, header):
+#     file_name_list = file_name.split("_")
+#     first_file_name = file_name_list[0]
+    
+#     header_list = []
+#     for each_header in header:
+#         each_header = each_header + " STRING"
+#         header_list.append(each_header)
+#     print('Header list: ' + str(header_list))
+#     query = f"""CREATE EXTERNAL TABLE IF NOT EXISTS {first_file_name} ( 
+#         {", ".join(header_list)}
+#     )
+#     ROW FORMAT DELIMITED
+#     FIELDS TERMINATED BY ','
+#     STORED AS TEXTFILE
+#     LOCATION 's3://bootcamps-2022-results/{year}/{month}/{day}/{file_name}'''"""
+#     print ('Query: ' + query)
+#     athena_client.start_query_execution(QueryString=query, QueryExecutionContext={'Database': 'studentsexample'}, ResultConfiguration={'OutputLocation': 's3://bootcamps-2022-results'})
+    
+
+
 
 def main():
-    file_name = CSVProcessor()
+    CSVProcessorReturn = CSVProcessor()
+    file_name = CSVProcessorReturn[0]
+    header = CSVProcessorReturn[1].split(",") 
+    print('File name: ' + file_name)
     ListBootamps(file_name)
+    # create_table(file_name, header)
 
 def lambda_handler(event, context):
     main()
     return "Success"
+
+# lambda_handler(None, None)

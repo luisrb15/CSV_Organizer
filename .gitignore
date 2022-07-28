@@ -11,3 +11,6 @@
 *.xlw
 *.xlam
 testing.py
+uploader.py
+__pycache__
+testing
