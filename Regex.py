@@ -12,7 +12,7 @@ s3 = boto3.client("s3")
 file_manager = FileManager(original_s3_bucket, s3)
 csv_list = file_manager.get_all_csvs('kcfiles/ATBootcamp')
 for csv in csv_list:
-    result = file_manager.get_csv_fixed(csv)
+    result = file_manager.get_csv_fixed(csv, ';')
     # body = body.replace("\n\n", " ")
     # body = body.replace("\n", " ")
     # header = body.split("\n")[0]

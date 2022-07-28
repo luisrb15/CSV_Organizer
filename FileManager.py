@@ -37,9 +37,9 @@ class FileManager:
                 body_with_semicolon.append(re.sub(',', param, match.group(groupNum)))
         return body_with_semicolon
 
-    def get_csv_fixed(self, csv):
+    def get_csv_fixed(self, csv, param):
 
-        array = self.get_csv_replaced_with_param(csv, ';')
+        array = self.get_csv_replaced_with_param(csv, param)
         body = self.get_body_with_format(csv)
         body_with_text_removed = re.sub(r"\"([^\"]*)\"", '', body)
         array_body_with_text_removed = body_with_text_removed.split(',')
