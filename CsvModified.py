@@ -1,4 +1,4 @@
-# Luis here is code that we did for the modified csv file i forgot to upload it too
+# Luis here is code that we did for the modified csv file I forgot to upload it too
 
 import json
 import boto3
@@ -12,15 +12,15 @@ year = dt.datetime.now().year
 month = dt.datetime.now().month
 day = dt.datetime.now().day
 
-csvlist = []
+csv_list = []
 for key in s3.list_objects(Bucket=original_s3_bucket)["Contents"]:
     if re.search("^kcfiles/ATBootcamp.*$", key["Key"]):
-        csvlist.append(key['Key'])
+        csv_list.append(key['Key'])
         last_modified = key
 
 var1 = s3.list_objects(Bucket=original_s3_bucket)["Contents"][-1]
 
-varKey = csvlist[1]
+varKey = csv_list[1]
 
 obj = s3.get_object(Bucket=original_s3_bucket, Key=varKey)
 
