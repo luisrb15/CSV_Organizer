@@ -15,59 +15,81 @@ destination_s3_bucket = 'bootcamps-2022-results'
 s3 = boto3.client("s3")
 athena_client = boto3.client('athena')
 
-def ListBootamps(file_name):
+objects_original_list = s3.list_objects(Bucket=original_s3_bucket)["Contents"]
+
+def LastModifiedFiles():
+    utc_now = dt.datetime.utcnow()
+    utc_minus_30 = utc_now - dt.timedelta(seconds=30)
+    last_uploaded_keys = []
+    for object in objects_original_list:
+        object_creation = object['LastModified']
+        object_creation = object_creation.replace(tzinfo=None)
+        if object_creation > utc_minus_30:
+            last_uploaded_keys.append(object['Key'])
+    logger.info('Last uploaded keys: ' + str(last_uploaded_keys))
+    return last_uploaded_keys
+
+def ObtainFileNames(last_uploaded_keys):
+    file_names = []
+    for key in last_uploaded_keys:
+        file_names.append(key.split("/")[-1])
+    logger.info("File names: " + str(file_names))
+    return file_names
+
+def ListBootamps(file_names):
     destination_folder = 'Bootcamps/'
     destination_file_name = "list.csv"
     combined_file_name = destination_folder + destination_file_name
-    file_name_list = file_name.split("_")
     header = "Bootcamp name, Initial date, End date"
-
     objects_key_list = []
     objects_list = s3.list_objects(Bucket=destination_s3_bucket)["Contents"]
     for objects in objects_list:
         objects_key_list.append(objects["Key"])    
+    for file in file_names:        
+        file_name_list = file.split("_")
+        if combined_file_name in objects_key_list:
+            file = s3.get_object(Bucket=destination_s3_bucket, Key= destination_folder + destination_file_name)['Body'].read().decode("utf-8")
+            rowslist = file.split("\n")[1:]
+            new_row = f"{file_name_list[0]}, {file_name_list[1]}, {file_name_list[3].split('.')[0]}"
+            if new_row not in rowslist:
+                rowslist.append(new_row)
+                rowslist.sort()
+                rowslist.insert(0, header)
+                bodylist = "\n".join(rowslist)
+                logger.info("New bootcamp added to list: " + new_row)
+                s3.put_object(Bucket=destination_s3_bucket, Key=destination_folder + destination_file_name, Body=bodylist)
+            else: 
+                logger.info("This bootcamp already exists in the list")
+        else:
+            new_row = f"{file_name_list[0]}, {file_name_list[1]}, {file_name_list[3].split('.')[0]}"
+            body = header + "\n" + new_row
+            s3.put_object(Bucket=destination_s3_bucket, Key=destination_folder + destination_file_name, Body=body)
 
-    if combined_file_name in objects_key_list:
-        file = s3.get_object(Bucket=destination_s3_bucket, Key= destination_folder + destination_file_name)['Body'].read().decode("utf-8")
-        rowslist = file.split("\n")[1:]
-        new_row = f"{file_name_list[0]}, {file_name_list[1]}, {file_name_list[3].split('.')[0]}"
-        if new_row not in rowslist:
-            rowslist.append(new_row)
-            rowslist.sort()
-            rowslist.insert(0, header)
-            bodylist = "\n".join(rowslist)
-            s3.put_object(Bucket=destination_s3_bucket, Key=destination_folder + destination_file_name, Body=bodylist)
-        else: 
-            logger.info("This bootcamp already exists in the list")
-    else:
-        new_row = f"{file_name_list[0]}, {file_name_list[1]}, {file_name_list[3].split('.')[0]}"
-        body = header + "\n" + new_row
-        s3.put_object(Bucket=destination_s3_bucket, Key=destination_folder + destination_file_name, Body=body)
-
-def CSVProcessor():
+def CSVProcessor(last_uploaded_keys, file_names):
     logger.info("Started CSVProcessor")
-    last_modified = s3.list_objects(Bucket=original_s3_bucket)["Contents"][-1]
-    for key in s3.list_objects(Bucket=original_s3_bucket)["Contents"]:
-        if key["LastModified"] > last_modified["LastModified"]:
-            last_modified = key
-    last_modified_key = last_modified["Key"]
+    number_of_file = 0
+    for key in last_uploaded_keys:
+        obj = s3.get_object(Bucket=original_s3_bucket, Key= key) # get last object in s3 bucket
+        file_name = file_names[number_of_file]
+        number_of_file += 1
+            
+        body = obj["Body"].read().decode("utf-8")
+        body = body.replace("\n\n", " ")
+        body = body.replace("%", "")
+        rows = body.split("\n")
+        for row in rows:
+            if row.count(",") == len(row)-1:
+                rows.remove(row)
+                break
+        header = rows[0]
+        rows.remove(header)
 
-    obj = s3.get_object(Bucket=original_s3_bucket, Key= last_modified_key) # get last object in s3 bucket
-    file_name = last_modified_key.split("/")[-1] # get last part of key
-        
-    body = obj["Body"].read().decode("utf-8")
-    header = body.split("\n")[0]
-    body = body.replace("\n\n", " ")
-    body = body.replace("\n", " ")
-    body = body.replace("%", "")
-    rows = body.split("\n")[1:]
+        destination_key = f"{year}/{month}/{day}/{file_name}" # create new key
 
-    destination_key = f"{year}/{month}/{day}/{file_name}" # create new key
+        destination_body = header + "\n" + "\n".join(rows) # join header and rows
 
-    destination_body = header + "\n" + "\n".join(rows) # join header and rows
+        s3.put_object(Bucket=destination_s3_bucket, Key=destination_key, Body=destination_body)
 
-    s3.put_object(Bucket=destination_s3_bucket, Key=destination_key, Body=destination_body)
-    return file_name, header
 
 # def create_table(file_name, header):
 #     file_name_list = file_name.split("_")
@@ -92,11 +114,10 @@ def CSVProcessor():
 
 
 def main():
-    CSVProcessorReturn = CSVProcessor()
-    file_name = CSVProcessorReturn[0]
-    header = CSVProcessorReturn[1].split(",") 
-    print('File name: ' + file_name)
-    ListBootamps(file_name)
+    last_uploaded_keys = LastModifiedFiles()
+    file_names = ObtainFileNames(last_uploaded_keys)
+    CSVProcessor(last_uploaded_keys, file_names)
+    ListBootamps(file_names)
     # create_table(file_name, header)
 
 def lambda_handler(event, context):
