@@ -23,9 +23,12 @@ file_name = last_modified_key.split("/")[-1]  # get last part of key
 body = obj["Body"].read().decode("utf-8")
 # varBody = re.search(r'\"([\s\S]*?)\"', body)
 matches = re.finditer(r"\"([^\"]*)\"", body, re.MULTILINE)
+print('MATCHES: \n', matches)
 array = []
 newBody = re.sub(r"\"([^\"]*)\"", '', body)
+print('NEW BODY: \n', newBody)
 for matchNum, match in enumerate(matches, start=1):
+    print("Match {matchNum} was found at {start}-{end}: {match}".format(matchNum=matchNum, start=match.start(), end=match.end(), match=match.group()))
     for groupNum in range(0, len(match.groups())):
         groupNum = groupNum + 1
         array.append(re.sub(',', ';', match.group(groupNum)))
@@ -39,12 +42,17 @@ for arrayvar in array:
                 break
 newBody3 = ",".join(newBody2)
 
-body = body.replace("\n\n", " ")
-body = body.replace("\n", " ")
+body = newBody3.replace("\n\n", " ")
 header = body.split("\n")[0]
 rows = body.split("\n")[1:]
-
+print(body)
 destination_key = destination_s3_bucket[1] + "results/" + f"{year}/{month}/{day}/{file_name}"  # create new key
 print(destination_key)
 destination_body = header + "\n" + "\n".join(rows)  # join header and rows
 # s3.put_object(Bucket=destination_s3_bucket[0], Key=destination_key, Body=destination_body)
+
+# save file locally with body
+with open(file_name, "w") as file:
+    file.write(newBody2)
+    file.close()
+

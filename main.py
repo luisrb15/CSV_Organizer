@@ -1,6 +1,7 @@
 import boto3
 import datetime as dt
 import logging
+import re
 
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
@@ -76,6 +77,8 @@ def CSVProcessor(last_uploaded_keys, file_names):
         body = obj["Body"].read().decode("utf-8")
         body = body.replace("\n\n", " ")
         body = body.replace("%", "")
+        # body = re.sub(r'"([^"]*)"', lambda m: m.group(1).replace(',', ';'), body)
+        # body = re.sub(r'"([^"]*)"', lambda m: m.group(1).replace('\n', ' '), body)
         rows = body.split("\n")
         for row in rows:
             if row.count(",") == len(row)-1:
