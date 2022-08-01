@@ -20,14 +20,14 @@ s3 = boto3.client("s3")
 objects_original_list = s3.list_objects(Bucket=original_s3_bucket)["Contents"]
 file_manager = FileManager(original_s3_bucket, s3)
 
-def ObtainFileNames(last_uploaded_keys):
+def obtain_file_ames(last_uploaded_keys):
     file_names = []
     for key in last_uploaded_keys:
         file_names.append(key.split("/")[-1])
     logger.info("File names: " + str(file_names))
     return file_names
 
-def ListBootamps(file_names):
+def list_bootamps(file_names):
     destination_folder = 'Bootcamps/'
     destination_file_name = "list.csv"
     combined_file_name = destination_folder + destination_file_name
@@ -56,8 +56,8 @@ def ListBootamps(file_names):
             body = header + "\n" + new_row
             s3.put_object(Bucket=destination_s3_bucket, Key=destination_folder + destination_file_name, Body=body)
 
-def CSVProcessor(keys, file_names):
-    logger.info("Started CSVProcessor")
+def csv_processor(keys, file_names):
+    logger.info("Started csv_processor")
     number_of_file = 0
     for key in keys:
         obj = s3.get_object(Bucket=original_s3_bucket, Key= key) # get last object in s3 bucket
@@ -75,31 +75,36 @@ def CSVProcessor(keys, file_names):
                 break
         header = rows[0]
         rows.remove(header)
-        body = AddColumn(file_name, header, rows)
+        body = add_column(file_name, header, rows)
         destination_key = f"{year}/{month}/{day}/{file_name}" # create new key
 
         destination_body = body
         s3.put_object(Bucket=destination_s3_bucket, Key=f'modified/{file_name}', Body=destination_body)
         s3.put_object(Bucket=destination_s3_bucket, Key=destination_key, Body=destination_body)
 
-def AddColumn(file_name, header, rows):
-    header = f'{header},Bootcamp name'
+def add_column(file_name, header, rows):
+    header = f'Bootcamp name,{header}'
     bootcamp_name = file_name.split("_")[0]
     aux = 0
     for row in rows:
-        row = row.replace("\n","")
-        newRow = f'{row},{bootcamp_name}'
+        newRow = f'{bootcamp_name},{row}'
         rows.remove(row)
         rows.insert(aux, newRow)
         aux += 1
     body = header + "\n" + "\n".join(rows)
+    print(body)
     return body
+
+def start_crawler():
+    glue_client = boto3.client('glue')
+    glue_client.start_crawler(Name='Crawler-LB')
 
 def main():
     keys = file_manager.get_all_csvs('ATBootcamp')
-    file_names = ObtainFileNames(keys)
-    CSVProcessor(keys, file_names)
-    ListBootamps(file_names)
+    file_names = obtain_file_ames(keys)
+    csv_processor(keys, file_names)
+    list_bootamps(file_names)
+    start_crawler()
 
 def lambda_handler(event, context):
     main()
