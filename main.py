@@ -1,3 +1,4 @@
+from tokenize import Name
 import boto3
 import datetime as dt
 import logging
@@ -14,13 +15,16 @@ day = dt.datetime.now().day
 
 original_s3_bucket = 'bootcamps-2022'
 destination_s3_bucket = 'bootcamps-2022-results'
+crawler_name = 'Crawler-LB'
 
 s3 = boto3.client("s3")
+glue = boto3.client("glue", region_name="us-east-1")
+
 
 objects_original_list = s3.list_objects(Bucket=original_s3_bucket)["Contents"]
 file_manager = FileManager(original_s3_bucket, s3)
 
-def obtain_file_ames(last_uploaded_keys):
+def obtain_file_names(last_uploaded_keys):
     file_names = []
     for key in last_uploaded_keys:
         file_names.append(key.split("/")[-1])
@@ -84,6 +88,9 @@ def csv_processor(keys, file_names):
 
 def add_column(file_name, header, rows):
     header = f'Bootcamp name,{header}'
+    header = header.replace(" ","_")
+    header = header.replace("(","")
+    header = header.replace(")","")
     bootcamp_name = file_name.split("_")[0]
     aux = 0
     for row in rows:
@@ -92,19 +99,21 @@ def add_column(file_name, header, rows):
         rows.insert(aux, newRow)
         aux += 1
     body = header + "\n" + "\n".join(rows)
-    print(body)
     return body
 
-def start_crawler():
-    glue_client = boto3.client('glue')
-    glue_client.start_crawler(Name='Crawler-LB')
+def crawler_start():
+    glue.start_crawler(
+        Name=crawler_name
+    )
+
+
 
 def main():
     keys = file_manager.get_all_csvs('ATBootcamp')
-    file_names = obtain_file_ames(keys)
+    file_names = obtain_file_names(keys)
     csv_processor(keys, file_names)
     list_bootamps(file_names)
-    start_crawler()
+    crawler_start()
 
 def lambda_handler(event, context):
     main()
