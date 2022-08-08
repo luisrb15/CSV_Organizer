@@ -1,3 +1,4 @@
+*.zip
 *.json
 *.csv
 *.xlsx
@@ -14,3 +15,9 @@ testing.py
 uploader.py
 __pycache__
 testing
+.terraform*
+*.tfstate*
+my_crawler
+
+
+
